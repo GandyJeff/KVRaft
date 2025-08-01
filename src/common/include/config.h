@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 // 开发阶段启用调试模式，便于追踪代码执行流程和问题定位；生产环境可关闭以提高性能。
 const bool Debug = true;
 
@@ -44,3 +46,8 @@ const int CONSENSUS_TIMEOUT = 500 * debugMul; // 共识超时时间(ms)
 // 协程相关设置
 const int FIBER_THREAD_NUM = 1;             // 指定协程调度器使用的线程数量
 const bool FIBER_USE_CALLER_THREAD = false; // 控制协程调度器是否使用调用者线程作为工作线程，false 表示使用独立的线程池，避免阻塞调用者线程（如主线程）。
+
+// 定义KV服务的错误码，用于客户端与服务器间的状态通信
+const std::string OK = "OK";                         // 操作成功
+const std::string ErrNoKey = "ErrNoKey";             // 键不存在
+const std::string ErrWrongLeader = "ErrWrongLeader"; // 非Leader节点

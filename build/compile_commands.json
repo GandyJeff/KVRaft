@@ -1,0 +1,8 @@
+[
+{
+  "directory": "/root/KVRaft/build/src/rpc",
+  "command": "/usr/bin/c++  -I/root/KVRaft/src/common/include -I/root/KVRaft/src/raftCore/include -I/root/KVRaft/src/raftRpcPro/include -I/root/KVRaft/src/rpc/include -I/root/KVRaft/src/skipList/include -I/root/KVRaft/example -g -std=gnu++20 -o CMakeFiles/rpc_lib.dir/__/common/util.cpp.o -c /root/KVRaft/src/common/util.cpp",
+  "file": "/root/KVRaft/src/common/util.cpp",
+  "output": "src/rpc/CMakeFiles/rpc_lib.dir/__/common/util.cpp.o"
+}
+]

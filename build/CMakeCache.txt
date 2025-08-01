@@ -370,4 +370,10 @@ CMAKE_UNAME:INTERNAL=/usr/bin/uname
 CMAKE_VERBOSE_MAKEFILE-ADVANCED:INTERNAL=1
 //linker supports push/pop state
 _CMAKE_LINKER_PUSHPOP_STATE_SUPPORTED:INTERNAL=TRUE
+//Description of the variable
+src_common:INTERNAL=/root/KVRaft/src/common/util.cpp
+//Description of the variable
+src_raftRpcPro:INTERNAL=/root/KVRaft/src/raftRpcPro/raftRpc.pb.cc
+//Description of the variable
+src_rpc:INTERNAL=
 

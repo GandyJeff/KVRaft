@@ -1,0 +1,2 @@
+/usr/bin/ar qc /root/KVRaft/lib/librpc_lib.a CMakeFiles/rpc_lib.dir/__/common/util.cpp.o
+/usr/bin/ranlib /root/KVRaft/lib/librpc_lib.a

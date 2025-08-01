@@ -1,0 +1,74 @@
+ syntax = "proto3";  // 使用 Protocol Buffers 3 语法
+
+ package raftRpcProctoc;  // 定义命名空间
+
+ option cc_generic_services = true;  // 开启service
+
+// 表示 Raft 日志中的一个条目
+ message LogEntry{
+    bytes Command   =1;  // 命令内容
+    int32 LogTerm   =2;  // 创建该日志时的任期号
+    int32 LogIndex  =3;  // 日志在序列中的位置索引
+}
+
+// leader向follower发送的日志复制请求参数
+message AppendEntriesArgs  {
+    int32 Term                 =1;  // 领导者当前任期
+    int32 LeaderId             =2;  // 领导者节点ID，标识发送请求的领导者
+    int32 PrevLogIndex         =3;  // 前一个日志条目的索引
+    int32 PrevLogTerm          =4;  // 前一个日志条目的任期
+    repeated LogEntry Entries  =5;  // 要追加的日志条目列表（为空时作为心跳）
+    int32 LeaderCommit         =6;  // 领导者已提交的日志位置，用于通知跟随者提交日志
+}
+
+// follower对 AppendEntries 请求的响应
+message AppendEntriesReply {
+    int32 Term            =1;  // 响应节点的当前任期，可能会更新领导者的任期
+    bool Success          =2;  // 是否成功追加日志
+    int32 UpdateNextIndex =3;  // 建议的下一个日志索引
+    int32 AppState        =4;  // 标识节点（网络）状态
+}
+
+// 候选人在选举过程中发送的投票请求参数
+message RequestVoteArgs  {
+    int32 Term         =1;  // 候选人当前任期
+    int32 CandidateId  =2;  // 请求投票的候选人ID
+
+    // 候选人最后一个日志的信息，用于投票者判断日志完整性
+    int32 LastLogIndex =3;  // 候选人最后一个日志的索引
+    int32 LastLogTerm  =4;  // 候选人最后一个日志的任期
+}
+
+// 节点对投票请求的响应
+message RequestVoteReply  {
+    int32 Term        =1;  // 响应节点的当前任期，可能会更新候选人的任期
+    bool VoteGranted  =2;  // 是否授予投票
+    int32 VoteState   =3;  // 详细的投票状态信息
+}
+
+// 领导者向落后节点发送的快照安装请求
+message InstallSnapshotRequest  {
+    int32 LeaderId                 =1;  // 领导者ID
+    int32 Term                     =2;  // 领导者当前任期
+    int32 LastSnapShotIncludeIndex =3;  // 快照中包含的最后一个日志索引
+    int32 LastSnapShotIncludeTerm  =4;  // 快照中包含的最后一个日志任期
+    bytes Data                     =5;  // 快照数据（序列化的状态机数据）
+}
+
+// 节点对快照安装请求的响应,领导者可根据任期信息更新自身状态
+message InstallSnapshotResponse  {
+    int32 Term  =1;  // 当前节点的任期
+}
+
+
+// 定义 Raft 节点之间的 RPC 通信接口
+service raftRpc  {
+    // 日志复制和心跳
+    rpc AppendEntries (AppendEntriesArgs) returns(AppendEntriesReply);
+
+    // 快照安装
+    rpc InstallSnapshot (InstallSnapshotRequest) returns (InstallSnapshotResponse);
+
+    // 选举投票
+    rpc RequestVote (RequestVoteArgs) returns (RequestVoteReply);
+}
