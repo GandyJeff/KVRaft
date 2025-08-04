@@ -9,6 +9,11 @@ set(CMAKE_DEPENDS_LANGUAGES
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/root/KVRaft/src/common/util.cpp" "src/rpc/CMakeFiles/rpc_lib.dir/__/common/util.cpp.o" "gcc" "src/rpc/CMakeFiles/rpc_lib.dir/__/common/util.cpp.o.d"
+  "/root/KVRaft/src/rpc/mprpcchannel.cpp" "src/rpc/CMakeFiles/rpc_lib.dir/mprpcchannel.cpp.o" "gcc" "src/rpc/CMakeFiles/rpc_lib.dir/mprpcchannel.cpp.o.d"
+  "/root/KVRaft/src/rpc/mprpcconfig.cpp" "src/rpc/CMakeFiles/rpc_lib.dir/mprpcconfig.cpp.o" "gcc" "src/rpc/CMakeFiles/rpc_lib.dir/mprpcconfig.cpp.o.d"
+  "/root/KVRaft/src/rpc/mprpccontroller.cpp" "src/rpc/CMakeFiles/rpc_lib.dir/mprpccontroller.cpp.o" "gcc" "src/rpc/CMakeFiles/rpc_lib.dir/mprpccontroller.cpp.o.d"
+  "/root/KVRaft/src/rpc/rpcheader.pb.cc" "src/rpc/CMakeFiles/rpc_lib.dir/rpcheader.pb.cc.o" "gcc" "src/rpc/CMakeFiles/rpc_lib.dir/rpcheader.pb.cc.o.d"
+  "/root/KVRaft/src/rpc/rpcprovider.cpp" "src/rpc/CMakeFiles/rpc_lib.dir/rpcprovider.cpp.o" "gcc" "src/rpc/CMakeFiles/rpc_lib.dir/rpcprovider.cpp.o.d"
   )
 
 # Targets to which this target links which contain Fortran sources.

@@ -373,7 +373,7 @@ _CMAKE_LINKER_PUSHPOP_STATE_SUPPORTED:INTERNAL=TRUE
 //Description of the variable
 src_common:INTERNAL=/root/KVRaft/src/common/util.cpp
 //Description of the variable
-src_raftRpcPro:INTERNAL=/root/KVRaft/src/raftRpcPro/raftRpc.pb.cc
+src_raftRpcPro:INTERNAL=/root/KVRaft/src/raftRpcPro/kvServerRPC.pb.cc;/root/KVRaft/src/raftRpcPro/raftRpc.pb.cc
 //Description of the variable
-src_rpc:INTERNAL=
+src_rpc:INTERNAL=/root/KVRaft/src/rpc/mprpcchannel.cpp;/root/KVRaft/src/rpc/mprpcconfig.cpp;/root/KVRaft/src/rpc/mprpccontroller.cpp;/root/KVRaft/src/rpc/rpcheader.pb.cc;/root/KVRaft/src/rpc/rpcprovider.cpp
 

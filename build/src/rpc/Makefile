@@ -154,6 +154,126 @@ __/common/util.cpp.s:
 	cd /root/KVRaft/build && $(MAKE) $(MAKESILENT) -f src/rpc/CMakeFiles/rpc_lib.dir/build.make src/rpc/CMakeFiles/rpc_lib.dir/__/common/util.cpp.s
 .PHONY : __/common/util.cpp.s
 
+mprpcchannel.o: mprpcchannel.cpp.o
+.PHONY : mprpcchannel.o
+
+# target to build an object file
+mprpcchannel.cpp.o:
+	cd /root/KVRaft/build && $(MAKE) $(MAKESILENT) -f src/rpc/CMakeFiles/rpc_lib.dir/build.make src/rpc/CMakeFiles/rpc_lib.dir/mprpcchannel.cpp.o
+.PHONY : mprpcchannel.cpp.o
+
+mprpcchannel.i: mprpcchannel.cpp.i
+.PHONY : mprpcchannel.i
+
+# target to preprocess a source file
+mprpcchannel.cpp.i:
+	cd /root/KVRaft/build && $(MAKE) $(MAKESILENT) -f src/rpc/CMakeFiles/rpc_lib.dir/build.make src/rpc/CMakeFiles/rpc_lib.dir/mprpcchannel.cpp.i
+.PHONY : mprpcchannel.cpp.i
+
+mprpcchannel.s: mprpcchannel.cpp.s
+.PHONY : mprpcchannel.s
+
+# target to generate assembly for a file
+mprpcchannel.cpp.s:
+	cd /root/KVRaft/build && $(MAKE) $(MAKESILENT) -f src/rpc/CMakeFiles/rpc_lib.dir/build.make src/rpc/CMakeFiles/rpc_lib.dir/mprpcchannel.cpp.s
+.PHONY : mprpcchannel.cpp.s
+
+mprpcconfig.o: mprpcconfig.cpp.o
+.PHONY : mprpcconfig.o
+
+# target to build an object file
+mprpcconfig.cpp.o:
+	cd /root/KVRaft/build && $(MAKE) $(MAKESILENT) -f src/rpc/CMakeFiles/rpc_lib.dir/build.make src/rpc/CMakeFiles/rpc_lib.dir/mprpcconfig.cpp.o
+.PHONY : mprpcconfig.cpp.o
+
+mprpcconfig.i: mprpcconfig.cpp.i
+.PHONY : mprpcconfig.i
+
+# target to preprocess a source file
+mprpcconfig.cpp.i:
+	cd /root/KVRaft/build && $(MAKE) $(MAKESILENT) -f src/rpc/CMakeFiles/rpc_lib.dir/build.make src/rpc/CMakeFiles/rpc_lib.dir/mprpcconfig.cpp.i
+.PHONY : mprpcconfig.cpp.i
+
+mprpcconfig.s: mprpcconfig.cpp.s
+.PHONY : mprpcconfig.s
+
+# target to generate assembly for a file
+mprpcconfig.cpp.s:
+	cd /root/KVRaft/build && $(MAKE) $(MAKESILENT) -f src/rpc/CMakeFiles/rpc_lib.dir/build.make src/rpc/CMakeFiles/rpc_lib.dir/mprpcconfig.cpp.s
+.PHONY : mprpcconfig.cpp.s
+
+mprpccontroller.o: mprpccontroller.cpp.o
+.PHONY : mprpccontroller.o
+
+# target to build an object file
+mprpccontroller.cpp.o:
+	cd /root/KVRaft/build && $(MAKE) $(MAKESILENT) -f src/rpc/CMakeFiles/rpc_lib.dir/build.make src/rpc/CMakeFiles/rpc_lib.dir/mprpccontroller.cpp.o
+.PHONY : mprpccontroller.cpp.o
+
+mprpccontroller.i: mprpccontroller.cpp.i
+.PHONY : mprpccontroller.i
+
+# target to preprocess a source file
+mprpccontroller.cpp.i:
+	cd /root/KVRaft/build && $(MAKE) $(MAKESILENT) -f src/rpc/CMakeFiles/rpc_lib.dir/build.make src/rpc/CMakeFiles/rpc_lib.dir/mprpccontroller.cpp.i
+.PHONY : mprpccontroller.cpp.i
+
+mprpccontroller.s: mprpccontroller.cpp.s
+.PHONY : mprpccontroller.s
+
+# target to generate assembly for a file
+mprpccontroller.cpp.s:
+	cd /root/KVRaft/build && $(MAKE) $(MAKESILENT) -f src/rpc/CMakeFiles/rpc_lib.dir/build.make src/rpc/CMakeFiles/rpc_lib.dir/mprpccontroller.cpp.s
+.PHONY : mprpccontroller.cpp.s
+
+rpcheader.pb.o: rpcheader.pb.cc.o
+.PHONY : rpcheader.pb.o
+
+# target to build an object file
+rpcheader.pb.cc.o:
+	cd /root/KVRaft/build && $(MAKE) $(MAKESILENT) -f src/rpc/CMakeFiles/rpc_lib.dir/build.make src/rpc/CMakeFiles/rpc_lib.dir/rpcheader.pb.cc.o
+.PHONY : rpcheader.pb.cc.o
+
+rpcheader.pb.i: rpcheader.pb.cc.i
+.PHONY : rpcheader.pb.i
+
+# target to preprocess a source file
+rpcheader.pb.cc.i:
+	cd /root/KVRaft/build && $(MAKE) $(MAKESILENT) -f src/rpc/CMakeFiles/rpc_lib.dir/build.make src/rpc/CMakeFiles/rpc_lib.dir/rpcheader.pb.cc.i
+.PHONY : rpcheader.pb.cc.i
+
+rpcheader.pb.s: rpcheader.pb.cc.s
+.PHONY : rpcheader.pb.s
+
+# target to generate assembly for a file
+rpcheader.pb.cc.s:
+	cd /root/KVRaft/build && $(MAKE) $(MAKESILENT) -f src/rpc/CMakeFiles/rpc_lib.dir/build.make src/rpc/CMakeFiles/rpc_lib.dir/rpcheader.pb.cc.s
+.PHONY : rpcheader.pb.cc.s
+
+rpcprovider.o: rpcprovider.cpp.o
+.PHONY : rpcprovider.o
+
+# target to build an object file
+rpcprovider.cpp.o:
+	cd /root/KVRaft/build && $(MAKE) $(MAKESILENT) -f src/rpc/CMakeFiles/rpc_lib.dir/build.make src/rpc/CMakeFiles/rpc_lib.dir/rpcprovider.cpp.o
+.PHONY : rpcprovider.cpp.o
+
+rpcprovider.i: rpcprovider.cpp.i
+.PHONY : rpcprovider.i
+
+# target to preprocess a source file
+rpcprovider.cpp.i:
+	cd /root/KVRaft/build && $(MAKE) $(MAKESILENT) -f src/rpc/CMakeFiles/rpc_lib.dir/build.make src/rpc/CMakeFiles/rpc_lib.dir/rpcprovider.cpp.i
+.PHONY : rpcprovider.cpp.i
+
+rpcprovider.s: rpcprovider.cpp.s
+.PHONY : rpcprovider.s
+
+# target to generate assembly for a file
+rpcprovider.cpp.s:
+	cd /root/KVRaft/build && $(MAKE) $(MAKESILENT) -f src/rpc/CMakeFiles/rpc_lib.dir/build.make src/rpc/CMakeFiles/rpc_lib.dir/rpcprovider.cpp.s
+.PHONY : rpcprovider.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -166,6 +286,21 @@ help:
 	@echo "... __/common/util.o"
 	@echo "... __/common/util.i"
 	@echo "... __/common/util.s"
+	@echo "... mprpcchannel.o"
+	@echo "... mprpcchannel.i"
+	@echo "... mprpcchannel.s"
+	@echo "... mprpcconfig.o"
+	@echo "... mprpcconfig.i"
+	@echo "... mprpcconfig.s"
+	@echo "... mprpccontroller.o"
+	@echo "... mprpccontroller.i"
+	@echo "... mprpccontroller.s"
+	@echo "... rpcheader.pb.o"
+	@echo "... rpcheader.pb.i"
+	@echo "... rpcheader.pb.s"
+	@echo "... rpcprovider.o"
+	@echo "... rpcprovider.i"
+	@echo "... rpcprovider.s"
 .PHONY : help
 
 
