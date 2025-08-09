@@ -176,3 +176,9 @@ void sleepNMilliseconds(int N);                           // 线程休眠N毫秒
 
 void DPrintf(const char *format, ...);                                    // 调试日志输出（带时间戳）
 void myAssert(bool condition, std::string message = "Assertion failed!"); // 断言函数，条件不满足时输出错误信息并终止程序，用于开发阶段错误检测
+
+#define _CONCAT(a, b) a##b
+#define _MAKE_DEFER_(line) DeferClass _CONCAT(defer_placeholder, line) = [&]()
+
+#undef DEFER
+#define DEFER _MAKE_DEFER_(__LINE__)

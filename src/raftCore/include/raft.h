@@ -74,7 +74,7 @@ public:
 
     // 日志复制相关方法
     // 处理追加日志请求
-    void AppendEntries1(const raftRpcProctoc::AppendEntriesArgs *args, raftRpcProctoc::AppendEntriesReply *reply);
+    void AppendEntries(const raftRpcProctoc::AppendEntriesArgs *args, raftRpcProctoc::AppendEntriesReply *reply);
     // 发送追加日志请求
     bool sendAppendEntries(int server, std::shared_ptr<raftRpcProctoc::AppendEntriesArgs> args, std::shared_ptr<raftRpcProctoc::AppendEntriesReply> reply, std::shared_ptr<int> appendNums);
     // 匹配日志
@@ -93,7 +93,7 @@ public:
     void getLastLogIndexAndTerm(int *lastLogIndex, int *lastLogTerm);
     // 根据索引获取日志任期
     int getLogTermFromLogIndex(int logIndex);
-    // 日志逻辑索引转物理索引
+    // 日志逻辑索引转换为物理索引
     int getSlicesIndexFromLogIndex(int logIndex);
 
     // 心跳相关方法
