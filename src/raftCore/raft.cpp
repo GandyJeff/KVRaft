@@ -691,21 +691,212 @@ int Raft::getSlicesIndexFromLogIndex(int logIndex)
 
 /*------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 // 心跳相关方法
-// 发起心跳
+/// @brief 发起心跳
+/// 领导者定期调用，向所有跟随者发送心跳消息
 void Raft::doHeartBeat()
 {
+  // 1.线程安全保护
+  std::lock_guard<std::mutex> g(m_mtx);
+
+  // 2.状态检查
+  // 只有领导者才会发送心跳
+  if (m_status == Leader)
+  {
+    // 记录心跳触发并获取锁，准备发送AppendEntries请求
+    DPrintf("[func-Raft::doHeartBeat()-Leader: {%d}] Leader的心跳定时器触发了且拿到mutex，开始发送AE\n", m_me);
+    // 创建一个共享指针，用于跟踪发送的AppendEntries请求数量
+    auto appendNums = std::make_shared<int>(1);
+
+    // 3.遍历跟随者
+    // 遍历所有节点
+    for (int i = 0; i < m_peers.size(); i++)
+    {
+      // 只向跟随者发送心跳
+      if (i == m_me)
+      {
+        continue;
+      }
+      DPrintf("[func-Raft::doHeartBeat()-Leader: {%d}] Leader的心跳定时器触发了 index:{%d}\n", m_me, i);
+      // 断言检查，确保下一个要发送的日志索引有效(大于等于1)
+      myAssert(m_nextIndex[i] >= 1, format("rf.nextIndex[%d] = {%d}", i, m_nextIndex[i]));
+
+      // 4.快照检查
+      // 如果下一个要发送的日志索引小于等于最后一个快照包含的索引，说明需要发送快照而不是心跳
+      if (m_nextIndex[i] <= m_lastSnapshotIncludeIndex)
+      {
+        // 创建一个新线程调用 leaderSendSnapShot 函数发送快照，并继续处理下一个节点
+        std::thread t(&Raft::leaderSendSnapShot, this, i);
+        t.detach();
+        continue;
+      }
+
+      // 获取前一个日志条目的索引和任期
+      int preLogIndex = -1;
+      int PrevLogTerm = -1;
+      getPrevLogInfo(i, &preLogIndex, &PrevLogTerm);
+
+      // 5.准备请求
+      // 创建AppendEntries请求参数对象的共享指针
+      std::shared_ptr<raftRpcProctoc::AppendEntriesArgs> appendEntriesArgs = std::make_shared<raftRpcProctoc::AppendEntriesArgs>();
+      appendEntriesArgs->set_term(m_currentTerm);         // 当前任期
+      appendEntriesArgs->set_leaderid(m_me);              // 领导者ID
+      appendEntriesArgs->set_prevlogindex(preLogIndex);   // 前置日志索引
+      appendEntriesArgs->set_prevlogterm(PrevLogTerm);    // 前置日志任期
+      appendEntriesArgs->clear_entries();                 // 清空日志条目列表
+      appendEntriesArgs->set_leadercommit(m_commitIndex); // 领导者的提交索引
+
+      if (preLogIndex != m_lastSnapshotIncludeIndex)
+      {
+        for (int j = getSlicesIndexFromLogIndex(preLogIndex) + 1; j < m_logs.size(); ++j)
+        {
+          raftRpcProctoc::LogEntry *sendEntryPtr = appendEntriesArgs->add_entries();
+          *sendEntryPtr = m_logs[j];
+        }
+      }
+      else
+      {
+        for (const auto &item : m_logs)
+        {
+          raftRpcProctoc::LogEntry *sendEntryPtr = appendEntriesArgs->add_entries();
+          *sendEntryPtr = item;
+        }
+      }
+
+      // 获取最后一个日志条目的索引
+      int lastLogIndex = getLastLogIndex();
+      myAssert(appendEntriesArgs->prevlogindex() + appendEntriesArgs->entries_size() == lastLogIndex,
+               format("appendEntriesArgs.PrevLogIndex{%d}+len(appendEntriesArgs.Entries){%d} != lastLogIndex{%d}",
+                      appendEntriesArgs->prevlogindex(), appendEntriesArgs->entries_size(), lastLogIndex));
+
+      // 创建AppendEntries响应对象的共享指针
+      const std::shared_ptr<raftRpcProctoc::AppendEntriesReply> appendEntriesReply = std::make_shared<raftRpcProctoc::AppendEntriesReply>();
+      // 初始化为断开连接状态
+      appendEntriesReply->set_appstate(Disconnected);
+
+      // 6.异步发送
+      // 发送AppendEntries请求
+      std::thread t(&Raft::sendAppendEntries, this, i, appendEntriesArgs, appendEntriesReply, appendNums);
+      t.detach();
+    }
+
+    // 7.更新时间
+    // 更新最后一次重置心跳的时间为当前时间
+    m_lastResetHearBeatTime = now();
+  }
 }
-// 心跳定时器
+
+/// @brief 心跳定时器
+/// 领导者定期调用，触发心跳发送
 void Raft::leaderHearBeatTicker()
 {
+  // 1.无限循环
+  while (true)
+  {
+    // 2.领导者检查
+    // 当节点不是领导者时，进入内部循环
+    while (m_status != Leader)
+    {
+      // 每隔 HeartBeatTimeout 毫秒睡眠一次
+      usleep(1000 * HeartBeatTimeout);
+    }
+    // 静态原子计数器，用于记录心跳触发的次数。使用 atomic 确保多线程环境下的计数准确性。
+    static std::atomic<int32_t> atomicCount = 0;
+
+    // 3.时间计算
+    // 定义睡眠时间和唤醒时间变量
+    std::chrono::duration<signed long int, std::ratio<1, 1000000000>> suitableSleepTime{};
+    std::chrono::system_clock::time_point wakeTime{};
+    {
+      std::lock_guard<std::mutex> lock(m_mtx);
+      // 获取当前时间
+      wakeTime = now();
+      // 计算合适的睡眠时间：心跳超时时间加上最后一次重置心跳的时间，减去当前时间
+      suitableSleepTime = std::chrono::milliseconds(HeartBeatTimeout) + m_lastResetHearBeatTime - wakeTime;
+    }
+
+    // 4.睡眠
+    // 如果计算出的睡眠时间大于1毫秒，则进行睡眠
+    if (std::chrono::duration<double, std::milli>(suitableSleepTime).count() > 1)
+    {
+      // 输出调试信息，显示设置的睡眠时间。使用ANSI颜色代码 \033[1;35m 使输出为紫色， \033[0m 重置颜色。
+      std::cout << atomicCount << "\033[1;35m leaderHearBeatTicker();函数设置睡眠时间为: "
+                << std::chrono::duration_cast<std::chrono::milliseconds>(suitableSleepTime).count() << " 毫秒\033[0m"
+                << std::endl;
+      // 记录睡眠开始时间，用于后续计算实际睡眠时间
+      auto start = std::chrono::steady_clock::now();
+
+      // 将纳秒转换为微秒,根据计算出的睡眠时间进行睡眠
+      usleep(std::chrono::duration_cast<std::chrono::microseconds>(suitableSleepTime).count());
+
+      // 记录睡眠结束时间,并计算实际睡眠时间
+      auto end = std::chrono::steady_clock::now();
+      std::chrono::duration<double, std::milli> duration = end - start;
+
+      // 输出实际睡眠时间
+      std::cout << atomicCount << "\033[1;35m leaderHearBeatTicker();函数实际睡眠时间为: " << duration.count()
+                << " 毫秒\033[0m" << std::endl;
+      // 递增计数器
+      ++atomicCount;
+    }
+
+    // 检查最后一次重置心跳的时间是否大于当前唤醒时间。如果是，说明心跳已经被其他地方触发，跳过本次循环
+    if (std::chrono::duration<double, std::milli>(m_lastResetHearBeatTime - wakeTime).count() > 0)
+    {
+      continue;
+    }
+
+    // 5.心跳触发
+    // 发送心跳
+    doHeartBeat();
+  }
 }
 
+/*------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 // 定时器维护相关方法
-// 向状态机定时写入日志
+/// @brief 向状态机定时写入日志
+/// 定期将已提交的日志应用到状态机
 void Raft::applierTicker()
 {
+  // 1.无限循环
+  while (true)
+  {
+    // 2.线程安全保护
+    m_mtx.lock();
+
+    // 3.状态检查
+    // 如果是领导者，输出调试信息，记录最后应用的日志索引和提交索引
+    if (m_status == Leader)
+    {
+      DPrintf("[Raft::applierTicker() - raft{%d}]  m_lastApplied{%d}   m_commitIndex{%d}", m_me, m_lastApplied, m_commitIndex);
+    }
+
+    // 4.获取待应用日志
+    // 获取需要应用到状态机的日志消息
+    auto applyMsgs = getApplyLogs();
+
+    // 5.释放锁
+    m_mtx.unlock();
+
+    // 6.应用日志
+    // 检查是否有日志需要应用
+    if (!applyMsgs.empty())
+    {
+      // 记录需要应用的日志数量
+      DPrintf("[func- Raft::applierTicker()-raft{%d}] 向kvserver報告的applyMsgs長度爲：{%d}", m_me, applyMsgs.size());
+    }
+    // 遍历所有需要应用的日志消息，并将它们推送到应用通道applyChan
+    for (auto &message : applyMsgs)
+    {
+      applyChan->Push(message);
+    }
+
+    // 7.定期执行
+    // 睡眠 ApplyInterval 毫秒，控制日志应用的频率
+    sleepNMilliseconds(ApplyInterval);
+  }
 }
 
+/*------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 // 持久化相关方法
 // 持久化当前状态
 void Raft::persist()
@@ -741,9 +932,11 @@ int Raft::GetRaftStateSize()
 }
 
 /*------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-// // 其他方法
-// // 获取要应用的日志
-// std::vector<ApplyMsg> Raft::getApplyLogs(){}
+// 其他方法
+// 获取要应用的日志
+std::vector<ApplyMsg> Raft::getApplyLogs()
+{
+}
 // // 向KV服务器推送消息
 // void Raft::pushMsgToKvServer(ApplyMsg msg){}
 // // 开始处理命令
@@ -753,15 +946,31 @@ int Raft::GetRaftStateSize()
 
 /*------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 // RPC接口方法
-// RPC追加日志
-void Raft::AppendEntries(google::protobuf::RpcController *controller, const ::raftRpcProctoc::AppendEntriesArgs *request, ::raftRpcProctoc::AppendEntriesReply *response, ::google::protobuf::Closure *done)
+/// @brief RPC追加日志
+/// gRPC接口实现，处理追加日志请求
+void Raft::AppendEntries(google::protobuf::RpcController *controller,
+                         const ::raftRpcProctoc::AppendEntriesArgs *request,
+                         ::raftRpcProctoc::AppendEntriesReply *response, ::google::protobuf::Closure *done)
 {
+  AppendEntries(request, response);
+  done->Run();
 }
-// RPC安装快照
-void Raft::InstallSnapshot(google::protobuf::RpcController *controller, const ::raftRpcProctoc::InstallSnapshotRequest *request, ::raftRpcProctoc::InstallSnapshotResponse *response, ::google::protobuf::Closure *done)
+
+/// @brief RPC安装快照
+/// gRPC接口实现，处理安装快照请求
+void Raft::InstallSnapshot(google::protobuf::RpcController *controller,
+                           const ::raftRpcProctoc::InstallSnapshotRequest *request,
+                           ::raftRpcProctoc::InstallSnapshotResponse *response, ::google::protobuf::Closure *done)
 {
+  InstallSnapshot(request, response);
+  done->Run();
 }
-// RPC投票请求
-void Raft::RequestVote(google::protobuf::RpcController *controller, const ::raftRpcProctoc::RequestVoteArgs *request, ::raftRpcProctoc::RequestVoteReply *response, ::google::protobuf::Closure *done)
+
+/// @brief RPC投票请求
+/// gRPC接口实现，处理投票请求
+void Raft::RequestVote(google::protobuf::RpcController *controller, const ::raftRpcProctoc::RequestVoteArgs *request,
+                       ::raftRpcProctoc::RequestVoteReply *response, ::google::protobuf::Closure *done)
 {
+  RequestVote(request, response);
+  done->Run();
 }

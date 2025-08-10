@@ -2,6 +2,7 @@
 
 #include "raftRpcPro/include/raftRpc.pb.h"
 #include "raftRpcUtil.h"
+#include "ApplyMsg.h"
 #include "config.h"
 #include "util.h"
 
@@ -29,8 +30,8 @@ private:
     int m_me;                                          // 当前节点ID
     std::mutex m_mtx;                                  // 互斥锁
     std::vector<std::shared_ptr<RaftRpcUtil>> m_peers; // 其他节点的RPC客户端
+    std::shared_ptr<LockQueue<ApplyMsg>> applyChan;    // 向状态机发送消息的通道
     // std::shared_ptr<Persister> m_persister;            // 持久化对象
-    // std::shared_ptr<LockQueue<ApplyMsg>> applyChan;    // 向状态机发送消息的通道
     // std::unique_ptr<monsoon::IOManager> m_ioManager;   // IO管理器
 
     // 领导者选举相关成员变量
@@ -123,9 +124,9 @@ public:
     // 获取Raft状态大小
     int GetRaftStateSize();
 
-    // // 其他方法
-    // // 获取要应用的日志
-    // std::vector<ApplyMsg> getApplyLogs();
+    // 其他方法
+    // 获取要应用的日志
+    std::vector<ApplyMsg> getApplyLogs();
     // // 向KV服务器推送消息
     // void pushMsgToKvServer(ApplyMsg msg);
     // // 开始处理命令
