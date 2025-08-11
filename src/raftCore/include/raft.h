@@ -2,6 +2,7 @@
 
 #include "raftRpcPro/include/raftRpc.pb.h"
 #include "raftRpcUtil.h"
+#include "Persister.h"
 #include "ApplyMsg.h"
 #include "config.h"
 #include "util.h"
@@ -31,7 +32,7 @@ private:
     std::mutex m_mtx;                                  // 互斥锁
     std::vector<std::shared_ptr<RaftRpcUtil>> m_peers; // 其他节点的RPC客户端
     std::shared_ptr<LockQueue<ApplyMsg>> applyChan;    // 向状态机发送消息的通道
-    // std::shared_ptr<Persister> m_persister;            // 持久化对象
+    std::shared_ptr<Persister> m_persister;            // 持久化对象
     // std::unique_ptr<monsoon::IOManager> m_ioManager;   // IO管理器
 
     // 领导者选举相关成员变量
@@ -57,6 +58,34 @@ private:
 
     // 心跳相关成员变量
     std::chrono::_V2::system_clock::time_point m_lastResetHearBeatTime; // 最后重置心跳定时器的时间
+
+    // 内部类：用于Boost序列化，将Raft节点的关键状态数据进行序列化和反序列化，以便于持久化存储和恢复
+    class BoostPersistRaftNode
+    {
+    public:
+        // 设置为友元是Boost序列化机制的要求，允许Boost序列化框架访问该类的私有成员
+        friend class boost::serialization::access;
+
+        // Archive &ar ：序列化/反序列化的归档对
+        // const unsigned int version ：序列化版本号
+        template <typename Archive>
+        void serialize(Archive &ar, const unsigned int version)
+        {
+            // 使用Boost的序列化操作符，将成员变量序列化到归档或从归档中反序列化
+            ar & m_currentTerm;
+            ar & m_votedFor;
+            ar & m_lastSnapshotIncludeIndex;
+            ar & m_lastSnapshotIncludeTerm;
+            ar & m_logs;
+        }
+
+        int m_currentTerm;               // 当前节点的任期号
+        int m_votedFor;                  // 当前节点在本届任期内投票支持的候选人ID
+        int m_lastSnapshotIncludeIndex;  // 快照中包含的最后一个日志条目的索引
+        int m_lastSnapshotIncludeTerm;   // 快照中包含的最后一个日志条目的任期号
+        std::vector<std::string> m_logs; // 存储Raft日志条目
+        // std::unordered_map<std::string, int> umap;
+    };
 
 public:
     /* 领导者选举相关方法*/
@@ -127,12 +156,12 @@ public:
     // 其他方法
     // 获取要应用的日志
     std::vector<ApplyMsg> getApplyLogs();
-    // // 向KV服务器推送消息
-    // void pushMsgToKvServer(ApplyMsg msg);
-    // // 开始处理命令
-    // void Start(Op command, int *newLogIndex, int *newLogTerm, bool *isLeader);
-    // // 初始化
-    // void init(std::vector<std::shared_ptr<RaftRpcUtil>> peers, int me, std::shared_ptr<Persister> persister, std::shared_ptr<LockQueue<ApplyMsg>> applyCh);
+    // 向KV服务器推送消息
+    void pushMsgToKvServer(ApplyMsg msg);
+    // 开始处理命令
+    void Start(Op command, int *newLogIndex, int *newLogTerm, bool *isLeader);
+    // 初始化
+    void init(std::vector<std::shared_ptr<RaftRpcUtil>> peers, int me, std::shared_ptr<Persister> persister, std::shared_ptr<LockQueue<ApplyMsg>> applyCh);
 
     // RPC接口方法
     // RPC追加日志

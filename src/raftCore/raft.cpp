@@ -275,11 +275,6 @@ bool Raft::UpToDate(int index, int term)
   return term > lastTerm || (term == lastTerm && index >= lastIndex);
 }
 
-// 获取当前状态
-void Raft::GetState(int *term, bool *isLeader)
-{
-}
-
 /*------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 // 日志复制相关方法
 /// @brief 处理追加日志请求
@@ -898,37 +893,308 @@ void Raft::applierTicker()
 
 /*------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 // 持久化相关方法
-// 持久化当前状态
+
+// 基础持久化函数
+/// @brief 持久化当前状态
+/// 将当前的Raft状态持久化到存储
 void Raft::persist()
 {
+  auto data = persistData();
+  m_persister->SaveRaftState(data);
 }
-// 读取持久化数据
-void Raft::readPersist(std::string data)
+
+/// @brief 读取持久化数据
+/// 从存储中读取之前持久化的Raft状态
+void Raft::readPersist(std::string data) // 包含序列化的Raft状态数据data
 {
+  // 1.输入验证
+  // 检查输入数据是否为空
+  if (data.empty())
+  {
+    return;
+  }
+
+  // 2.准备反序列化环境
+  // 创建字符串流，并用输入数据初始化。用于将字符串数据转换为流，供Boost序列化库读取
+  std::stringstream iss(data);
+  // 关联到字符串流 iss，这是Boost序列化库的文本输入归档，用于反序列化数据
+  boost::archive::text_iarchive ia(iss);
+
+  // 3.反序列化
+  // 创建 BoostPersistRaftNode 类型的临时对象，该类是Raft的内部类，专门用于封装需要序列化/反序列化的状态数据
+  BoostPersistRaftNode boostPersistRaftNode;
+  // 使用Boost输入归档 ia 从流中读取数据并反序列化为 boostPersistRaftNode 对象
+  ia >> boostPersistRaftNode;
+
+  // 4.恢复核心状态
+  // 从反序列化得到的对象中恢复当前任期号
+  m_currentTerm = boostPersistRaftNode.m_currentTerm;
+  // 恢复当前任期内投票支持的候选人ID
+  m_votedFor = boostPersistRaftNode.m_votedFor;
+  // 恢复快照中包含的最后一个日志条目的索引
+  m_lastSnapshotIncludeIndex = boostPersistRaftNode.m_lastSnapshotIncludeIndex;
+  // 恢复快照中包含的最后一个日志条目的任期号
+  m_lastSnapshotIncludeTerm = boostPersistRaftNode.m_lastSnapshotIncludeTerm;
+
+  // 5.恢复日志
+  // 清空当前的日志列表，准备从持久化数据中恢复
+  m_logs.clear();
+  // 遍历反序列化得到的日志字符串列表
+  for (auto &item : boostPersistRaftNode.m_logs)
+  {
+    raftRpcProctoc::LogEntry logEntry;
+    logEntry.ParseFromString(item);
+    m_logs.emplace_back(logEntry); // 比 push_back 更高效，直接在容器内构造对象
+  }
 }
-// 获取要持久化的数据
+
+/// @brief 获取要持久化的数据
+/// 准备要持久化的Raft状态数据
 std::string Raft::persistData()
 {
+  // 1.数据封装
+  // 将Raft节点的核心状态数据复制到 boostPersistRaftNode 对象中
+  BoostPersistRaftNode boostPersistRaftNode;
+  boostPersistRaftNode.m_currentTerm = m_currentTerm;
+  boostPersistRaftNode.m_votedFor = m_votedFor;
+  boostPersistRaftNode.m_lastSnapshotIncludeIndex = m_lastSnapshotIncludeIndex;
+  boostPersistRaftNode.m_lastSnapshotIncludeTerm = m_lastSnapshotIncludeTerm;
+
+  // 2.日志序列化
+  // 遍历所有日志条目，将每个条目序列化为字符串并添加到 boostPersistRaftNode 对象的日志列表中
+  for (auto &item : m_logs)
+  {
+    // 调用Protocol Buffers库的方法，将 LogEntry 对象序列化为字符串
+    boostPersistRaftNode.m_logs.push_back(item.SerializeAsString());
+  }
+
+  // 3.序列化环境准备
+  std::stringstream ss;
+  // Boost序列化库中的文本输出归档
+  boost::archive::text_oarchive oa(ss);
+
+  // 4.对象序列化
+  // 将对象序列化到字符串流ss中
+  oa << boostPersistRaftNode;
+
+  // 5.返回序列化结果
+  return ss.str();
 }
-// 创建快照
+
+/*********************************************************************/
+/// @brief 创建快照
+/// 创建当前状态的快照，用于日志压缩
 void Raft::Snapshot(int index, std::string snapshot)
 {
+  // 1.线程安全保护
+  std::lock_guard<std::mutex> lg(m_mtx);
+
+  // 2.参数有效性检查
+  // 如果要创建的快照索引 index 小于等于当前最大快照索引 m_lastSnapshotIncludeIndex ，或者大于已提交日志索引 m_commitIndex ，则拒绝创建快照。
+  if (m_lastSnapshotIncludeIndex >= index || index > m_commitIndex)
+  {
+    DPrintf(
+        "[func-Snapshot-rf{%d}] rejects replacing log with snapshotIndex %d as current snapshotIndex %d is larger or "
+        "smaller ",
+        m_me, index, m_lastSnapshotIncludeIndex);
+    return;
+  }
+  // 获取最后日志索引
+  auto lastLogIndex = getLastLogIndex();
+
+  // 3.准备新快照信息
+  // 新快照包含的最后日志索引，赋值为参数 index
+  int newLastSnapshotIncludeIndex = index;
+  // 将日志索引转换为 m_logs 数组中的索引，再根据索引获取指定日志条目的任期号
+  int newLastSnapshotIncludeTerm = m_logs[getSlicesIndexFromLogIndex(index)].logterm();
+
+  // 4.日志压缩
+  // 创建新的日志向量 trunckedLogs
+  std::vector<raftRpcProctoc::LogEntry> trunckedLogs;
+  // 遍历从 index + 1 到最后日志索引的所有日志条目，这样可以截掉 index 及之前的日志条目
+  for (int i = index + 1; i <= getLastLogIndex(); i++)
+  {
+    trunckedLogs.push_back(m_logs[getSlicesIndexFromLogIndex(i)]);
+  }
+
+  // 5.状态更新
+  // 更新最大快照索引和对应任期
+  m_lastSnapshotIncludeIndex = newLastSnapshotIncludeIndex;
+  m_lastSnapshotIncludeTerm = newLastSnapshotIncludeTerm;
+  // 替换日志为截取后的日志
+  m_logs = trunckedLogs;
+  // 确保它们至少为 index
+  m_commitIndex = std::max(m_commitIndex, index);
+  m_lastApplied = std::max(m_lastApplied, index);
+
+  // 6.持久化
+  // 持久化方法，第一个参数是通过 persistData() 获取的序列化状态数据，第二个参数是快照数据
+  m_persister->Save(persistData(), snapshot);
+
+  // 7.调试与验证
+  DPrintf("[SnapShot]Server %d snapshot snapshot index {%d}, term {%d}, loglen {%d}", m_me, index,
+          m_lastSnapshotIncludeTerm, m_logs.size());
+  // 检查剩余日志长度加上快照索引是否等于之前记录的最后日志索引，确保日志完整性
+  myAssert(m_logs.size() + m_lastSnapshotIncludeIndex == lastLogIndex,
+           format("len(rf.logs){%d} + rf.lastSnapshotIncludeIndex{%d} != lastLogjInde{%d}", m_logs.size(),
+                  m_lastSnapshotIncludeIndex, lastLogIndex));
 }
-// 有条件安装快照
+
+/// @brief 有条件安装快照
+/// 检查是否应该安装快照
 bool Raft::CondInstallSnapshot(int lastIncludedTerm, int lastIncludedIndex, std::string snapshot)
 {
+  return true;
 }
-// 安装快照
+
+/// @brief 安装快照
+/// 处理来自领导者的快照安装请求
 void Raft::InstallSnapshot(const raftRpcProctoc::InstallSnapshotRequest *args, raftRpcProctoc::InstallSnapshotResponse *reply)
 {
+  // 1.线程安全保护
+  m_mtx.lock();
+  // 确保函数退出时自动释放互斥锁
+  DEFER { m_mtx.unlock(); };
+
+  // 2.任期检查
+  // 如果请求的任期小于当前节点的任期，说明发送请求的节点不是合法领导者，拒绝安装快照
+  if (args->term() < m_currentTerm)
+  {
+    // 设置响应中的任期号为当前节点的任期
+    reply->set_term(m_currentTerm);
+    return;
+  }
+  // 如果请求的任期大于当前节点的任期，更新当前节点的任期，重置投票记录，将状态改为跟随者，并持久化新状态
+  if (args->term() > m_currentTerm)
+  {
+    m_currentTerm = args->term();
+    m_votedFor = -1;
+    m_status = Follower;
+    persist();
+  }
+  // 确保节点状态为跟随者
+  m_status = Follower;
+  m_lastResetElectionTime = now(); // 最后重置选举定时器的时间
+
+  // 3.参数有效性检查
+  // 如果请求中的快照索引小于等于当前节点的最大快照索引，说明当前节点已有更新或相同的快照，无需安装
+  if (args->lastsnapshotincludeindex() <= m_lastSnapshotIncludeIndex)
+  {
+    return;
+  }
+
+  // 获取当前日志中的最后一个条目的索引
+  auto lastLogIndex = getLastLogIndex();
+
+  // 4.日志截断
+  // 如果最后日志索引大于快照索引，删除快照索引及之前的日志条目，保留快照索引之后的条目
+  if (lastLogIndex > args->lastsnapshotincludeindex())
+  {
+    // 删除日志向量中的指定范围元素
+    m_logs.erase(m_logs.begin(), m_logs.begin() + getSlicesIndexFromLogIndex(args->lastsnapshotincludeindex()) + 1);
+  }
+  // 如果最后日志索引小于等于快照索引，清空所有日志条目
+  else
+  {
+    m_logs.clear();
+  }
+
+  // 5.状态更新
+  // 更新状态变量
+  // 确保它们至少为快照索引
+  m_commitIndex = std::max(m_commitIndex, args->lastsnapshotincludeindex());
+  m_lastApplied = std::max(m_lastApplied, args->lastsnapshotincludeindex());
+  // 更新快照相关状态变量：最大快照索引和对应任期
+  m_lastSnapshotIncludeIndex = args->lastsnapshotincludeindex();
+  m_lastSnapshotIncludeTerm = args->lastsnapshotincludeterm();
+
+  // 6.响应设置
+  // 设置响应中的任期号为当前节点的任期
+  reply->set_term(m_currentTerm);
+
+  // 7.快照应用
+  // 设置快照相关信息
+  ApplyMsg msg;
+  msg.SnapshotValid = true;    // 标记快照有效
+  msg.Snapshot = args->data(); // 获取快照数据
+  msg.SnapshotTerm = args->lastsnapshotincludeterm();
+  msg.SnapshotIndex = args->lastsnapshotincludeindex();
+
+  // 创建新线程调用 pushMsgToKvServer 方法，将快照消息推送到KV服务器
+  std::thread t(&Raft::pushMsgToKvServer, this, msg);
+  t.detach();
+
+  // 8.持久化
+  // 持久化快照和状态
+  m_persister->Save(persistData(), args->data());
 }
-// 发送快照
+
+/// @brief 发送快照
+/// 领导者向跟随者发送快照
 void Raft::leaderSendSnapShot(int server)
 {
+  // 1.线程安全保护
+  m_mtx.lock();
+
+  // 2.请求准备
+  // 创建快照请求对象，用于封装快照请求信息
+  raftRpcProctoc::InstallSnapshotRequest args;
+  // 设置请求参数
+  args.set_leaderid(m_me);                                       // 设置领导者ID为当前节点ID
+  args.set_term(m_currentTerm);                                  // 设置请求的任期为当前节点的任期
+  args.set_lastsnapshotincludeindex(m_lastSnapshotIncludeIndex); // 设置快照包含的最后日志索引
+  args.set_lastsnapshotincludeterm(m_lastSnapshotIncludeTerm);   // 设置快照包含的最后日志任期
+  args.set_data(m_persister->ReadSnapshot());                    // 设置快照数据，通过 m_persister->ReadSnapshot() 读取持久化的快照数据
+
+  // 接收响应信息
+  raftRpcProctoc::InstallSnapshotResponse reply;
+
+  // 3.释放锁
+  // RPC调用可能会阻塞，避免长时间持有锁
+  m_mtx.unlock();
+
+  // 4.发送RPC
+  // 通过 m_peers[server] 调用目标服务器的 InstallSnapshot 方法发送快照请求
+  bool ok = m_peers[server]->InstallSnapshot(&args, &reply);
+
+  // 5.重新获取锁
+  m_mtx.lock();
+  DEFER { m_mtx.unlock(); };
+
+  // 6.响应处理
+  // 检查RPC调用是否成功
+  if (!ok)
+  {
+    return;
+  }
+  // 如果当前节点不再是领导者，或者任期发生了变化，直接返回
+  if (m_status != Leader || m_currentTerm != args.term())
+  {
+    return;
+  }
+
+  // 7.状态更新
+  // 如果响应中的任期大于当前节点的任期，更新当前节点的任期，重置投票记录，将状态改为跟随者，持久化新状态，并重置选举计时器
+  if (reply.term() > m_currentTerm)
+  {
+    m_currentTerm = reply.term();
+    m_votedFor = -1;
+    m_status = Follower;
+    persist();
+    m_lastResetElectionTime = now();
+    return;
+  }
+  // 更新目标跟随者的匹配索引为快照包含的最后日志索引
+  m_matchIndex[server] = args.lastsnapshotincludeindex();
+  // 更新目标跟随者的下一个索引为匹配索引加1，表示下一次将从该索引开始发送日志
+  m_nextIndex[server] = m_matchIndex[server] + 1;
 }
-// 获取Raft状态大小
+
+/// @brief 获取Raft状态大小
+/// 获取当前持久化的Raft状态大小
 int Raft::GetRaftStateSize()
 {
+  return m_persister->RaftStateSize();
 }
 
 /*------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -937,12 +1203,16 @@ int Raft::GetRaftStateSize()
 std::vector<ApplyMsg> Raft::getApplyLogs()
 {
 }
-// // 向KV服务器推送消息
-// void Raft::pushMsgToKvServer(ApplyMsg msg){}
-// // 开始处理命令
-// void Raft::Start(Op command, int *newLogIndex, int *newLogTerm, bool *isLeader){}
-// // 初始化
-// void Raft::init(std::vector<std::shared_ptr<RaftRpcUtil>> peers, int me, std::shared_ptr<Persister> persister, std::shared_ptr<LockQueue<ApplyMsg>> applyCh){}
+// 向KV服务器推送消息
+void Raft::pushMsgToKvServer(ApplyMsg msg) {}
+// 开始处理命令
+void Raft::Start(Op command, int *newLogIndex, int *newLogTerm, bool *isLeader) {}
+// 初始化
+void Raft::init(std::vector<std::shared_ptr<RaftRpcUtil>> peers, int me, std::shared_ptr<Persister> persister, std::shared_ptr<LockQueue<ApplyMsg>> applyCh) {}
+// 获取当前状态
+void Raft::GetState(int *term, bool *isLeader)
+{
+}
 
 /*------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 // RPC接口方法
