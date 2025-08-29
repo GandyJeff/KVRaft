@@ -15,6 +15,7 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 # 设置项目编译头文件搜索路径 -I
 include_directories(${PROJECT_SOURCE_DIR}/src/common/include)
 include_directories(${PROJECT_SOURCE_DIR}/src/raftCore/include)
+include_directories(${PROJECT_SOURCE_DIR}/src/raftClerk/include)
 include_directories(${PROJECT_SOURCE_DIR}/src/raftRpcPro/include)
 include_directories(${PROJECT_SOURCE_DIR}/src/rpc/include)
 include_directories(${PROJECT_SOURCE_DIR}/src/skipList/include)
@@ -28,7 +29,11 @@ add_subdirectory(src)
 # example包含了使用的示例代码
 add_subdirectory(example)
 
-add_library(skip_list_on_raft STATIC  ${src_rpc} ${src_common} ${src_raftRpcPro})
+add_library(skip_list_on_raft STATIC  ${src_rpc} ${rpc_example} ${src_common} ${src_raftCore} ${src_raftRpcPro} )
 target_link_libraries(skip_list_on_raft muduo_net muduo_base pthread dl)
 
-
+add_custom_target(format
+        COMMAND bash ${PROJECT_SOURCE_DIR}/format.sh
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        COMMAND echo "format done!"
+)

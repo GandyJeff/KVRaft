@@ -1,4 +1,5 @@
-#pragma once
+#ifndef PERSISTER_H
+#define PERSISTER_H
 
 #include <fstream>
 #include <mutex>
@@ -48,3 +49,5 @@ public:
     // 析构函数，负责清理资源
     ~Persister();
 };
+
+#endif // PERSISTER_H

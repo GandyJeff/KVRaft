@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RAFTRPCUTIL_H
+#define RAFTRPCUTIL_H
 
 #include "raftRpc.pb.h"
 
@@ -19,7 +20,6 @@ public:
     bool RequestVote(raftRpcProctoc::RequestVoteArgs *args, raftRpcProctoc::RequestVoteReply *response);
     // 响应其他节点的方法
     /**
-     *
      * @param ip  远端ip
      * @param port  远端端口
      */
@@ -27,3 +27,5 @@ public:
     RaftRpcUtil(std::string ip, short port);
     ~RaftRpcUtil();
 };
+
+#endif // RAFTRPCUTIL_H

@@ -65,6 +65,10 @@
         "typeindex": "cpp",
         "typeinfo": "cpp",
         "variant": "cpp",
-        "*.inc": "cpp"
+        "*.inc": "cpp",
+        "csignal": "cpp",
+        "codecvt": "cpp",
+        "future": "cpp",
+        "cfenv": "cpp"
     }
 }

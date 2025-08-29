@@ -1,28 +1,41 @@
-#pragma once
+#ifndef RAFT_H
+#define RAFT_H
 
-#include "raftRpcPro/include/raftRpc.pb.h"
+#include "raftRpc.pb.h"
 #include "raftRpcUtil.h"
 #include "Persister.h"
 #include "ApplyMsg.h"
 #include "config.h"
 #include "util.h"
-
+#include <boost/serialization/string.hpp>
+#include <boost/serialization/vector.hpp>
+#include "boost/any.hpp"
+#include "boost/serialization/serialization.hpp"
 #include <chrono>
+#include <cmath>
+#include <iostream>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <thread>
+#include <vector>
 
 /*
 extern 的核心作用是：将符号的链接属性从内部改为外部，可被其他文件访问
-使用 extern constexpr 声明一个可在编译期求值的外部常量，且必须在声明时初始化（因为需编译期求值）
+extern constexpr 这两个关键字的组合是不兼容的
+constexpr 要求变量必须在声明时初始化（因为它的值在编译时必须可知），而 extern 声明通常不初始化变量（定义变量的地方才初始化）。这种矛盾导致 extern constexpr 成为无效的C++语法
+使用static constexpr避免链接冲突
 */
 
 /// @brief 网络状态表示
-extern constexpr int Disconnected = 0; // 网络异常
-extern constexpr int AppNormal = 1;    // 网络正常
+static constexpr int Disconnected = 0; // 网络异常
+static constexpr int AppNormal = 1;    // 网络正常
 
 /// @brief 投票状态
-extern constexpr int Killed = 0; // 已终止
-extern constexpr int Voted = 1;  // 已投票
-extern constexpr int Expire = 2; // 过期
-extern constexpr int Normal = 3; // 正常
+static constexpr int Killed = 0; // 已终止
+static constexpr int Voted = 1;  // 已投票
+static constexpr int Expire = 2; // 过期
+static constexpr int Normal = 3; // 正常
 
 class Raft : public raftRpcProctoc::raftRpc
 {
@@ -45,7 +58,7 @@ private:
         Leader
     }; // 节点状态枚举
     Status m_status;                                                    // 当前节点状态
-    std::chrono::_V2::system_clock::time_point m_lastResetElectionTime; // 最后重置选举定时器的时间
+    std::chrono::_V2::system_clock::time_point m_lastResetElectionTime; // 最后重置选举定时器的时间，选举超时定时器
 
     // 日志复制相关成员变量
     std::vector<raftRpcProctoc::LogEntry> m_logs; // 日志条目数组
@@ -171,3 +184,5 @@ public:
     // RPC投票请求
     void RequestVote(google::protobuf::RpcController *controller, const ::raftRpcProctoc::RequestVoteArgs *request, ::raftRpcProctoc::RequestVoteReply *response, ::google::protobuf::Closure *done) override;
 };
+
+#endif // RAFT_H

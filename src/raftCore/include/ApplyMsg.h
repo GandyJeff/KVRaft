@@ -1,4 +1,5 @@
-#pragma once
+#ifndef APPLYMSG_H
+#define APPLYMSG_H
 
 #include <string>
 
@@ -27,3 +28,5 @@ public:
 
           };
 };
+
+#endif // APPLYMSG_H
